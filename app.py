@@ -4,11 +4,7 @@ import datetime
 from stock_selection_v1 import stock_status
 
 st.title("📈 Nifty 500 Screener")
-
-uploaded_file = st.file_uploader("Upload Nifty 500 CSV", type=["csv"])
-
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
+df = pd.read_csv("ind_nifty500list.csv")
 
     # Convert to Yahoo Finance format
     tickers = df['Symbol'].dropna().apply(lambda x: f"{x}.NS").tolist()
