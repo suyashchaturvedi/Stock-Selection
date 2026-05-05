@@ -41,7 +41,7 @@ if uploaded_file is not None:
         if len(results) == 0:
             st.error("No results generated. Check ticker format or data availability.")
         else:
-            df_res = pd.DataFrame(results).T
+            df_res = pd.DataFrame(results)
 
             # Add score
             score_cols = ['AboveSMA9', 'SuperTrend', 'MACD', 'ma_20_50_cross']
