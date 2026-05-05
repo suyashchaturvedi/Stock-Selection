@@ -1,77 +1,43 @@
 import streamlit as st
 import pandas as pd
-import datetime
-import yfinance as yf
 from stock_selection_v1 import stock_status
 
 st.set_page_config(layout="wide")
-st.title("📊 Nifty 500 Trading Dashboard")
+st.title("📊 Nifty 500 Screener (Stable Version)")
 
-uploaded_file = st.file_uploader("Upload Nifty 500 CSV", type=["csv"])
+uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 
-if uploaded_file is not None:
+if uploaded_file:
 
     df = pd.read_csv(uploaded_file)
 
-    if 'Symbol' not in df.columns:
-        st.error("CSV must contain 'Symbol' column")
+    if "Symbol" not in df.columns:
+        st.error("CSV must contain 'Symbol'")
         st.stop()
 
-    df['Ticker'] = df['Symbol'].astype(str).str.strip() + ".NS"
-    tickers = df['Ticker'].dropna().tolist()
+    tickers = df["Symbol"].dropna().astype(str).str.strip() + ".NS"
 
-    st.success(f"Loaded {len(tickers)} stocks")
+    st.write(f"Total stocks: {len(tickers)}")
 
-    start_date = datetime.date(2023, 1, 1)
-    end_date = datetime.date.today()
+    if st.button("🚀 Run Screener"):
 
-    if st.button("🚀 Run Dashboard"):
+        with st.spinner("Fetching data..."):
 
-        with st.spinner("Running screener..."):
+            result_df = stock_status(tickers)
 
-            result = stock_status(tickers, start_date, end_date)
-
-        # 🔥 DEBUG: show how many worked
-        st.write(f"Stocks processed successfully: {len(result)}")
-
-        if not result:
-            st.error("No results generated. Likely Yahoo API/network issue.")
+        if result_df.empty:
+            st.error("❌ No data fetched. This is due to Yahoo blocking requests.")
             st.stop()
 
-        df_res = pd.DataFrame.from_dict(result, orient='index')
+        st.success(f"✅ Stocks processed: {len(result_df)}")
 
-        # Clean CMP
-        df_res['cmp'] = pd.to_numeric(df_res['cmp'], errors='coerce').round(2)
+        # scoring
+        result_df["Score"] = result_df[["AboveSMA9","MACD","ma_20_50_cross"]].sum(axis=1)
 
-        # Score
-        score_cols = ['AboveSMA9', 'MACD', 'ma_20_50_cross']
-        df_res['Score'] = df_res[score_cols].sum(axis=1)
+        result_df = result_df.sort_values("Score", ascending=False)
 
-        df_res = df_res.sort_values(by='Score', ascending=False)
+        st.subheader("🏆 Top 10 Picks")
+        st.dataframe(result_df.head(10), use_container_width=True)
 
-        st.success("Dashboard Ready")
-
-        st.subheader("🏆 Top 10 Stocks")
-        st.dataframe(df_res.head(10), use_container_width=True)
-
-        # Chart
-        st.subheader("📈 Stock Chart")
-        selected = st.selectbox("Select stock", df_res['ticker'])
-
-        if selected:
-            chart = yf.download(selected, period="6mo")
-            if not chart.empty:
-                st.line_chart(chart['Close'])
-
-        # Download
-        csv = df_res.to_csv(index=False).encode('utf-8')
-
-        st.download_button(
-            "Download Results",
-            csv,
-            "results.csv",
-            "text/csv"
-        )
-
-        with st.expander("View Full Data"):
-            st.dataframe(df_res, use_container_width=True)
+        st.subheader("📋 Full Results")
+        st.dataframe(result_df, use_container_width=True)
