@@ -1,104 +1,79 @@
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import time
 
-# ================= BASIC FUNCTIONS =================
+# ================= SAFE FETCH =================
 
-def current_candle(df):
-    return (
-        float(df['Open'].iloc[-1]),
-        float(df['High'].iloc[-1]),
-        float(df['Low'].iloc[-1]),
-        float(df['Close'].iloc[-1])
-    )
+def fetch_data(tick):
+    try:
+        df = yf.download(
+            tick,
+            period="3mo",
+            interval="1d",
+            progress=False,
+            threads=False
+        )
 
-def prev_day_candle(df):
-    return (
-        float(df['Open'].iloc[-2]),
-        float(df['High'].iloc[-2]),
-        float(df['Low'].iloc[-2]),
-        float(df['Close'].iloc[-2])
-    )
+        if df is not None and not df.empty:
+            return df
+
+        # fallback method
+        df = yf.Ticker(tick).history(period="3mo")
+
+        if df is not None and not df.empty:
+            return df
+
+    except:
+        return None
+
+    return None
 
 # ================= INDICATORS =================
 
-def sma(df, period):
-    return df['Close'].rolling(period).mean().values
+def sma(df, n):
+    return df['Close'].rolling(n).mean()
 
 def MACD(df):
-    fast = df['Close'].ewm(span=12, adjust=False).mean()
-    slow = df['Close'].ewm(span=26, adjust=False).mean()
+    fast = df['Close'].ewm(span=12).mean()
+    slow = df['Close'].ewm(span=26).mean()
     macd = fast - slow
-    signal = macd.ewm(span=9, adjust=False).mean()
-    return macd.values, signal.values
+    signal = macd.ewm(span=9).mean()
+    return macd, signal
 
-def RSI(df, period=11):
-    delta = df['Close'].diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(com=period-1).mean()
-    avg_loss = loss.ewm(com=period-1).mean()
-    rs = avg_gain / avg_loss
-    return (100 - (100 / (1 + rs))).values
+# ================= MAIN =================
 
-# ================= PATTERNS =================
+def stock_status(tickers, start=None, end=None):
 
-def bullish_engulfing(df):
-    op, _, _, cp = prev_day_candle(df)
-    oc, _, _, cc = current_candle(df)
-    return (op > cp) and (oc < cc) and (oc <= cp) and (cc > op)
+    results = []
 
-def bearish_engulfing(df):
-    op, _, _, cp = prev_day_candle(df)
-    oc, _, _, cc = current_candle(df)
-    return (op < cp) and (oc > cc) and (oc >= cp) and (cc < op)
+    for i, tick in enumerate(tickers):
 
-# ================= MAIN FUNCTION =================
+        df = fetch_data(tick)
 
-def stock_status(tickers, start, end):
+        if df is None or len(df) < 20:
+            continue
 
-    status = {}
-    c = 0
-
-    for tick in tickers:
         try:
-            # 🔥 FIXED DOWNLOAD (reliable)
-            df = yf.download(
-                tick,
-                period="6mo",
-                interval="1d",
-                progress=False,
-                auto_adjust=True,
-                threads=False
-            )
-
-            # 🔥 FIXED FILTER
-            if df is None or df.empty:
-                continue
-
-            oc, hc, lc, cc = current_candle(df)
+            close = float(df['Close'].iloc[-1])
 
             sma9 = sma(df, 9)
             sma20 = sma(df, 20)
-            sma50 = sma(df, 50)
 
             macd, signal = MACD(df)
-            rsi = RSI(df)
 
-            status[c] = {
-                'ticker': tick,
-                'cmp': round(float(cc), 2),
-                'AboveSMA9': 1 if cc > sma9[-1] else -1,
-                'MACD': 1 if macd[-1] > signal[-1] else -1,
-                'ma_20_50_cross': 1 if sma20[-1] > sma50[-1] else -1,
-                'RSI': 1 if rsi[-1] >= 60 else (-1 if rsi[-1] <= 42 else 0),
-                'Bullish': 1 if bullish_engulfing(df) else 0,
-                'Bearish': -1 if bearish_engulfing(df) else 0
-            }
+            results.append({
+                "ticker": tick,
+                "cmp": round(close, 2),
+                "AboveSMA9": 1 if close > sma9.iloc[-1] else -1,
+                "MACD": 1 if macd.iloc[-1] > signal.iloc[-1] else -1,
+                "ma_20_50_cross": 1 if sma20.iloc[-1] > sma20.iloc[-5] else -1
+            })
 
-            c += 1
+            # avoid rate limiting
+            time.sleep(0.05)
 
-        except Exception:
+        except:
             continue
 
-    return status
+    return pd.DataFrame(results)
