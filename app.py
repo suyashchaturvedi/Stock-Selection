@@ -3,29 +3,56 @@ import pandas as pd
 import datetime
 from stock_selection_v1 import stock_status
 
+st.set_page_config(layout="wide")
 st.title("📈 Nifty 500 Screener")
-df = pd.read_csv("ind_nifty500list.csv")
 
-# Convert to Yahoo Finance format
-tickers = df['Symbol'].dropna().apply(lambda x: f"{x}.NS").tolist()
+# Upload CSV
+uploaded_file = st.file_uploader("Upload Nifty 500 CSV", type=["csv"])
 
-st.write(f"Loaded {len(tickers)} stocks ✅")
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-start_date = datetime.date(2023, 1, 1)
-end_date = datetime.date.today()
+    # Convert symbols to Yahoo Finance format
+    tickers = df['Symbol'].dropna().apply(lambda x: f"{x}.NS").tolist()
 
-if st.button("🚀 Run Screener"):
-    result = stock_status(tickers, start_date, end_date)
+    st.success(f"Loaded {len(tickers)} stocks ✅")
+    st.write("Sample tickers:", tickers[:5])
 
-df_res = pd.DataFrame(result).T
+    start_date = datetime.date(2023, 1, 1)
+    end_date = datetime.date.today()
 
-score_cols = ['AboveSMA9','SuperTrend','MACD','ma_20_50_cross']
-df_res['Score'] = df_res[score_cols].sum(axis=1)
+    if st.button("🚀 Run Screener"):
 
-df_res = df_res.sort_values(by='Score', ascending=False)
+        results = {}
+        progress = st.progress(0)
 
-st.subheader("🏆 Top 20 Stocks")
-st.dataframe(df_res.head(20))
+        for i, tick in enumerate(tickers):
+            try:
+                res = stock_status([tick], start_date, end_date)
 
-with st.expander("View all"):
-    st.dataframe(df_res)
+                if res:
+                    results.update(res)
+
+            except Exception as e:
+                continue
+
+            progress.progress((i + 1) / len(tickers))
+
+        if len(results) == 0:
+            st.error("No results generated. Check ticker format or data availability.")
+        else:
+            df_res = pd.DataFrame(results).T
+
+            # Add score
+            score_cols = ['AboveSMA9', 'SuperTrend', 'MACD', 'ma_20_50_cross']
+            df_res['Score'] = df_res[score_cols].sum(axis=1)
+
+            df_res = df_res.sort_values(by='Score', ascending=False)
+
+            st.success("Analysis Complete ✅")
+
+            st.subheader("🏆 Top 20 Stocks")
+            st.dataframe(df_res.head(20), use_container_width=True)
+
+            with st.expander("View all results"):
+                st.dataframe(df_res, use_container_width=True)
