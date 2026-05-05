@@ -222,11 +222,10 @@ def stock_status(tickers, st, end):
   c = 0
   for tick in tickers:
     """     try: """
-    df3 = yf.download(tick, start=st, end=end,auto_adjust=True)
-    """     except:
-          continue """
-
-    """     try: """
+    df3 = yf.download(tick, start=st, end=end, auto_adjust=True)
+    # 🚨 CRITICAL FIX
+    if df3 is None or df3.empty or len(df3) < 50:
+      continue
     oc, hc, lc, cc = current_candle(df3)
     hp, lp, cp = prev_month_candle(df3)
     s1,s2,s3,pp,r1,r2,r3 = fibo_levels(df3)
