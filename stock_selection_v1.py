@@ -62,10 +62,18 @@ def stock_status(tickers, start, end):
 
     for tick in tickers:
         try:
-            df = yf.download(tick, start=start, end=end, progress=False)
+            # 🔥 FIXED DOWNLOAD (reliable)
+            df = yf.download(
+                tick,
+                period="6mo",
+                interval="1d",
+                progress=False,
+                auto_adjust=True,
+                threads=False
+            )
 
-            # 🚨 critical filter (THIS WAS YOUR MAIN BUG)
-            if df is None or df.empty or len(df) < 50:
+            # 🔥 FIXED FILTER
+            if df is None or df.empty:
                 continue
 
             oc, hc, lc, cc = current_candle(df)
