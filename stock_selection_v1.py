@@ -1,322 +1,142 @@
-import datetime
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 import yfinance as yf
 
+# ===================== BASIC CANDLE FUNCTIONS =====================
+
 def current_candle(df):
-  HighCurr = round(df.High.iloc[-1], 2)
-  LowCurr = round(df.Low.iloc[-1], 2)
-  CloseCurr = round(df.Close.iloc[-1], 2)
-  OpenCurr = round(df.Open.iloc[-1], 2)
-
-  return OpenCurr, HighCurr, LowCurr, CloseCurr
-
-def prev_month_candle(df):
-  df2 = df.reset_index()
-  curr_date = df2.Date.iloc[-1]
-  curr_month = curr_date.month
-  if curr_month == 1:
-    prev_month = 12
-  else:
-    prev_month = curr_month - 1
-
-  masked_month = df2['Date'].map(lambda x: x.month) == prev_month
-  prev_month_df = df2[masked_month]
-
-  high = round(max(prev_month_df.High.values).item(), 2)
-  low = round(min(prev_month_df.Low.values).item(), 2)
-  close = round(prev_month_df.Close.iloc[-1].item(), 2)
-
-  # print("Prev_High", high)
-  # print("Prev_Low", low)
-  # print("Prev_Close", close)
-
-  return high, low, close
-
-def fibo_levels(df):
-  HIGHprev, LOWprev, CLOSEprev = prev_month_candle(df)
-  PP = round((HIGHprev + LOWprev + CLOSEprev) / 3, 2)
-  R1 = round(PP + 0.382 * (HIGHprev - LOWprev), 2)
-  S1 = round(PP - 0.382 * (HIGHprev - LOWprev), 2)
-  R2 = round(PP + 0.618 * (HIGHprev - LOWprev), 2)
-  S2 = round(PP - 0.618 * (HIGHprev - LOWprev), 2)
-  R3 = round(PP + (HIGHprev - LOWprev), 2)
-  S3 = round(PP - (HIGHprev - LOWprev), 2)
-
-  # print("Pivot_Point", PP)
-  # print("R3", R3)
-  # print("R2", R2)
-  # print("R1", R1)
-  # print("S1", S1)
-  # print("S2", S2)
-  # print("S3", S3)
-
-  return S1, S2, S3, PP, R1, R2, R3
-
-def sma(df, period):
-  sma = df.Close.rolling(period).mean().values
-
-  return sma
-
-def ema(df, period, column='Close', alpha=False):
-
-    con = pd.concat([df[column][:period].rolling(window=period).mean(), df[column][period:]])
-
-    if (alpha == True):
-        # (1 - alpha) * previous_val + alpha * current_val where alpha = 1 / period
-        a = con.ewm(alpha=1 / period, adjust=False).mean()
-    else:
-        # ((current_val - previous_val) * coeff) + previous_val where coeff = 2 / (period + 1)
-        a = con.ewm(span=period, adjust=False).mean()
-
-    return a.values
-
-def atr_(df, period=20):
-  df1 = pd.DataFrame()
-  atr = 'ATR_' + str(period)
-
-  if not 'TR' in df1.columns:
-      df1['h-l'] = df.High - df.Low
-      df1['h-yc'] = abs(df.High - df['Close'].shift(1))
-      df1['l-yc'] = abs(df.Low - df['Close'].shift(1))
-
-      df1['TR'] = df1[['h-l', 'h-yc', 'l-yc']].max(axis=1)
-
-      df1.drop(['h-l', 'h-yc', 'l-yc'], inplace=True, axis=1)
-
-  df1[atr]=ema(df1, period, column='TR', alpha=True)
-
-  return df1
-
-def ATR(DF,n=20):
-    "function to calculate True Range and Average True Range"
-    df = DF.copy()
-    #print(df)
-    df['H-L']=abs(df['High']-df['Low'])
-    df['H-PC']=abs(df['High']-df['Close'].shift(1))
-    df['L-PC']=abs(df['Low']-df['Close'].shift(1))
-    df['TR']=df[['H-L','H-PC','L-PC']].max(axis=1,skipna=False)
-    df['ATR'] = df['TR'].rolling(n).mean()
-    #df['ATR'] = df['TR'].ewm(span=n,adjust=False,min_periods=n).mean()
-    df2 = df.drop(['H-L','H-PC','L-PC'],axis=1)
-    s_array = df2['ATR'].to_numpy()
-    return s_array
-
-def MACD(df, fast_length=12, slow_length=26, signal_length=9):
-  fast_ema = df.Close.ewm(span=fast_length, adjust=False).mean()
-  slow_ema = df.Close.ewm(span=slow_length, adjust=False).mean()
-  macd = fast_ema - slow_ema
-  signal = macd.ewm(span=signal_length, adjust=False).mean()
-
-  return macd.values, signal.values
+    return (
+        float(df['Open'].iloc[-1]),
+        float(df['High'].iloc[-1]),
+        float(df['Low'].iloc[-1]),
+        float(df['Close'].iloc[-1])
+    )
 
 def prev_day_candle(df):
-  open_prev = round(df.Open.iloc[-2], 2)
-  high_prev = round(df.High.iloc[-2], 2)
-  low_prev = round(df.Low.iloc[-2], 2)
-  close_prev = round(df.Close.iloc[-2], 2)
+    return (
+        float(df['Open'].iloc[-2]),
+        float(df['High'].iloc[-2]),
+        float(df['Low'].iloc[-2]),
+        float(df['Close'].iloc[-2])
+    )
 
-  return open_prev, high_prev, low_prev, close_prev
+# ===================== TECHNICAL INDICATORS =====================
 
-def check_bullish_ingulfing(df):
-    op, hp, lp, cp = prev_day_candle(df)
-    oc, hc, lc, cc = current_candle(df)
+def sma(df, period):
+    return df['Close'].rolling(period).mean().values
 
-    if op > cp and oc < cc:
-        if oc <= cp and cc > op:
-            return True
-    return False
-  
-def check_bearish_ingulfing(df):
-    op, hp, lp, cp = prev_day_candle(df)
-    oc, hc, lc, cc = current_candle(df)
+def ema(df, period):
+    return df['Close'].ewm(span=period, adjust=False).mean().values
 
-    if op < cp and oc > cc:
-        if oc >= cp and cc < op:
-            return True
-    return False
-  
-def SuperTrend(df, period, multiplier, ohlc=['Open', 'High', 'Low', 'Close']):
+def ATR(df, n=20):
+    df = df.copy()
+    df['H-L'] = abs(df['High'] - df['Low'])
+    df['H-PC'] = abs(df['High'] - df['Close'].shift(1))
+    df['L-PC'] = abs(df['Low'] - df['Close'].shift(1))
+    df['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
+    df['ATR'] = df['TR'].rolling(n).mean()
+    return df['ATR'].values
 
-  df1=atr_(df, period)
-  atr = 'ATR_' + str(period)
-  st = 'ST_' + str(period) + '_' + str(multiplier)
-  stx = 'STX_' + str(period) + '_' + str(multiplier)
+def MACD(df):
+    fast = df['Close'].ewm(span=12, adjust=False).mean()
+    slow = df['Close'].ewm(span=26, adjust=False).mean()
+    macd = fast - slow
+    signal = macd.ewm(span=9, adjust=False).mean()
+    return macd.values, signal.values
 
-  # Compute basic upper and lower bands
-  df1['basic_ub'] = ((df.High + df.Low) / 2).squeeze() + multiplier * df1[atr].fillna(0)
-  df1['basic_lb'] = ((df.High + df.Low) / 2).squeeze() - multiplier * df1[atr].fillna(0)
+def RSI(df, period=11):
+    delta = df['Close'].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=period-1).mean()
+    avg_loss = loss.ewm(com=period-1).mean()
+    rs = avg_gain / avg_loss
+    return (100 - (100 / (1 + rs))).values
 
-  # Compute final upper and lower bands
-  df1['final_ub'] = 0.00
-  df1['final_lb'] = 0.00
-  for i in range(period, len(df)):
-    df1.loc[df1.index[i], 'final_ub'] = df1['basic_ub'].iat[i] if df1['basic_ub'].iat[i] < df1['final_ub'].iat[i - 1] or df[ohlc[3]].iloc[i - 1, 0] > df1['final_ub'].iat[i - 1] else df1['final_ub'].iat[i - 1]
-    df1.loc[df1.index[i], 'final_lb'] = df1['basic_lb'].iat[i] if df1['basic_lb'].iat[i] > df1['final_lb'].iat[i - 1] or df[ohlc[3]].iloc[i - 1, 0] < df1['final_lb'].iat[i - 1] else df1['final_lb'].iat[i - 1]
-  # Set the Supertrend value
-  df1[st] = 0.00
-  for i in range(period, len(df)):
-      df1.loc[df1.index[i], st] = df1['final_ub'].iat[i] if df1[st].iat[i - 1] == df1['final_ub'].iat[i - 1] and df[ohlc[3]].iloc[i, 0] <= df1['final_ub'].iat[i] else \
-                           df1['final_lb'].iat[i] if df1[st].iat[i - 1] == df1['final_ub'].iat[i - 1] and df[ohlc[3]].iloc[i, 0] >  df1['final_ub'].iat[i] else \
-                           df1['final_lb'].iat[i] if df1[st].iat[i - 1] == df1['final_lb'].iat[i - 1] and df[ohlc[3]].iloc[i, 0] >= df1['final_lb'].iat[i] else \
-                           df1['final_ub'].iat[i] if df1[st].iat[i - 1] == df1['final_lb'].iat[i - 1] and df[ohlc[3]].iloc[i, 0] <  df1['final_lb'].iat[i] else 0.00
-  # Mark the trend direction up/down
-  df1[stx] = np.where((df1[st] > 0.00), np.where((df[ohlc[3]].squeeze() < df1[st]), 'down',  'up'), "")
+# ===================== PATTERN CHECKS =====================
 
-  # Remove basic and final bands from the columns
-  df1.drop(['basic_ub', 'basic_lb', 'final_ub', 'final_lb'], inplace=True, axis=1)
-  return df1
+def bullish_engulfing(df):
+    op, _, _, cp = prev_day_candle(df)
+    oc, _, _, cc = current_candle(df)
+    return (op > cp) and (oc < cc) and (oc <= cp) and (cc > op)
 
-def check_morning_star(df):
-    op, hp, lp, cp = prev_day_candle(df)
-    oc, hc, lc, cc = current_candle(df)
-    opp, hpp, lpp, cpp = df.iloc[-3].Open, df.iloc[-3].High, df.iloc[-3].Low, df.iloc[-3].Close
-    volume = df.iloc[-5:].Volume.values
+def bearish_engulfing(df):
+    op, _, _, cp = prev_day_candle(df)
+    oc, _, _, cc = current_candle(df)
+    return (op < cp) and (oc > cc) and (oc >= cp) and (cc < op)
 
-    if opp > cpp and oc < cc:
-        dogi = abs(op - cp)
-        body_current = abs(oc - cc)
-        body_prev = abs(opp - cpp)
+# ===================== SUPER TREND =====================
 
-        if (opp - cpp) / opp >= 0.02:
-            if min(op, cp) < max(opp, cc):
-                if body_current >= 0.7 * body_prev:
-                    if dogi <= 0.1 * body_current:
-                        return True
-    return False
+def supertrend(df, period=10, multiplier=3):
+    hl2 = (df['High'] + df['Low']) / 2
+    atr = pd.Series(ATR(df, period))
+    upperband = hl2 + multiplier * atr
+    lowerband = hl2 - multiplier * atr
 
-def check_evening_star(df):
-    op, hp, lp, cp = prev_day_candle(df)
-    oc, hc, lc, cc = current_candle(df)
-    opp, hpp, lpp, cpp = df.iloc[-3].Open, df.iloc[-3].High, df.iloc[-3].Low, df.iloc[-3].Close
-    volume = df.iloc[-5:].Volume.values
+    st = pd.Series(index=df.index, dtype=float)
+    trend = pd.Series(index=df.index, dtype=str)
 
-    if opp < cpp and oc > cc:
-        dogi = abs(op - cp)
-        body_current = abs(oc - cc)
-        body_prev = abs(opp - cpp)
+    for i in range(period, len(df)):
+        if df['Close'].iloc[i] > upperband.iloc[i-1]:
+            trend.iloc[i] = 'up'
+        elif df['Close'].iloc[i] < lowerband.iloc[i-1]:
+            trend.iloc[i] = 'down'
+        else:
+            trend.iloc[i] = trend.iloc[i-1]
 
-        if (cpp - opp) / opp >= 0.02:
-            if min(op, cp) < max(cpp, oc):
-                if body_current >= 0.8 * body_prev:
-                    if volume[-1] == max(volume) and dogi <= 0.1 * body_current:
-                        return True
-    return False
-  
-def RSI(df, rsi_period):
-  delta = df.Close.diff()
-  gain = delta.mask(delta < 0, 0)
-  loss = delta.mask(delta > 0, 0)
-  avg_gain = gain.ewm(com=rsi_period-1, min_periods=rsi_period).mean()
-  avg_loss = loss.ewm(com=rsi_period-1, min_periods=rsi_period).mean()
-  rs = abs(avg_gain / avg_loss)
-  rsi = 100 - (100/(1+rs))
+        st.iloc[i] = lowerband.iloc[i] if trend.iloc[i] == 'up' else upperband.iloc[i]
 
-  return rsi.values
+    return trend
 
+# ===================== MAIN FUNCTION =====================
 
-#Main function to run all the analysis and the functions for ranking of stocks based on technical analysis
-def stock_status(tickers, st, end):
-  status = {}
-  c = 0
-  for tick in tickers:
-    """     try: """
-    df3 = yf.download(tick, start=st, end=end, auto_adjust=True)
-    # 🚨 CRITICAL FIX
-    if df3 is None or df3.empty or len(df3) < 50:
-      continue
-    oc, hc, lc, cc = current_candle(df3)
-    hp, lp, cp = prev_month_candle(df3)
-    s1,s2,s3,pp,r1,r2,r3 = fibo_levels(df3)
-    """     except:
-          continue """
+def stock_status(tickers, start, end):
 
-    status[c] = {'ticker':tick}
-    status[c]['cmp'] = float(round(cc, 2))
-    sma_9 = sma(df3, 9)
-    sma_20 = sma(df3,20)
-    atr=ATR(df3)
-    macd, signal = MACD(df3, fast_length=12, slow_length=26, signal_length=9)
+    status = {}
+    c = 0
 
-    if cc > sma_9[-1]:
-      status[c]['AboveSMA9'] = 1
-    else:
-      status[c]['AboveSMA9'] = -1
+    for tick in tickers:
+        try:
+            df = yf.download(tick, start=start, end=end, progress=False)
 
-    if check_bullish_ingulfing(df3):
-      status[c]['BullishIngulfing'] = 1
-    else:
-      status[c]['BullishIngulfing'] = 0
+            # 🚨 critical filter
+            if df is None or df.empty or len(df) < 50:
+                continue
 
-    if check_bearish_ingulfing(df3):
-      status[c]['BearshIngulfing'] = -1
-    else:
-      status[c]['BearshIngulfing'] = 0
+            oc, hc, lc, cc = current_candle(df)
 
-    if SuperTrend(df3,10,3)['STX_10_3'].iloc[-1] == 'up':
-      status[c]['SuperTrend'] = 1
-    else:
-      status[c]['SuperTrend'] = -1
+            sma9 = sma(df, 9)
+            sma20 = sma(df, 20)
+            sma50 = sma(df, 50)
 
-    if (sma(df3,20)[-1] - sma(df3,50)[-1]) > 0:
-      status[c]['ma_20_50_cross'] = 1
-    else:
-      status[c]['ma_20_50_cross'] = -1
+            macd, signal = MACD(df)
+            rsi = RSI(df)
 
-    if (macd[-1] - signal[-1]) > 0:
-      status[c]['MACD'] = 1
-    else:
-      status[c]['MACD'] = -1
+            trend = supertrend(df)
 
-    if RSI(df3,11)[-1] >= 60:
-      status[c]['RSI_Above_60'] = 1
-    elif RSI(df3,11)[-1] >= 42 and RSI(df3,11)[-1] < 60:
-      status[c]['RSI_Above_60'] = 0
-      status[c]['RSI_Below_42'] = 0
-    else:
-      status[c]['RSI_Below_42'] = -1
+            status[c] = {
+                'ticker': tick,
+                'cmp': round(float(cc), 2)
+            }
 
-    if check_morning_star(df3):
-      status[c]['Morning_Star'] = 1
-    else:
-      status[c]['Morning_Star'] = 0
+            status[c]['AboveSMA9'] = 1 if cc > sma9[-1] else -1
+            status[c]['SuperTrend'] = 1 if trend.iloc[-1] == 'up' else -1
+            status[c]['MACD'] = 1 if (macd[-1] > signal[-1]) else -1
+            status[c]['ma_20_50_cross'] = 1 if sma20[-1] > sma50[-1] else -1
 
-    if check_evening_star(df3):
-      status[c]['Evening_Star'] = -1
-    else:
-      status[c]['Evening_Star'] = 0
+            if rsi[-1] >= 60:
+                status[c]['RSI'] = 1
+            elif rsi[-1] <= 42:
+                status[c]['RSI'] = -1
+            else:
+                status[c]['RSI'] = 0
 
-    if cc > pp:
-      if cc < r1:
-        status[c]['status'] = 'pivot point={}, break_out, R1={}'.format(pp,r1)
-        status[c]['Target']=r1
-        status[c]['SSL']=pp
-      elif cc < r2:
-        status[c]['status'] = 'R1={}, break_out, R2={}'.format(r1,r2)
-        status[c]['Target']=r2
-        status[c]['SSL']=r1
-      elif cc < r3:
-        status[c]['status'] = 'R2={}, break_out, R3={}'.format(r2,r3)
-        status[c]['Target']=r3
-        status[c]['SSL']=r2
-      else:
-        status[c]['status'] = 'Break_up all the resistances'
-        status[c]['Target']='7%'
-        status[c]['SSL']=r3
+            status[c]['Bullish'] = 1 if bullish_engulfing(df) else 0
+            status[c]['Bearish'] = -1 if bearish_engulfing(df) else 0
 
-    elif cc < pp:
-      if cc > s1:
-        status[c]['status'] = 'pivot point={}, break_down, s1={}'.format(pp, s1)
-      elif cc > s2:
-        status[c]['status'] = 'S1={}, break_down, s2={}'.format(s1,s2)
-      elif cc > s3:
-        status[c]['status'] = 'S2={}, break_down, s3={}'.format(s2,s3)
-      else:
-        status[c]['status'] = 'Break_down all the resistances'
+            c += 1
 
-    status[c]['MA'] = sma_20[-1]
-    status[c]['ATR'] = atr[-1]
-    c += 1
+        except Exception:
+            continue
 
-  return status
+    return status
