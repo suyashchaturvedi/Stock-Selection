@@ -31,8 +31,11 @@ if uploaded_file is not None:
 
             result = stock_status(tickers, start_date, end_date)
 
+        # 🔥 DEBUG: show how many worked
+        st.write(f"Stocks processed successfully: {len(result)}")
+
         if not result:
-            st.error("No results generated. Possible data/API issue.")
+            st.error("No results generated. Likely Yahoo API/network issue.")
             st.stop()
 
         df_res = pd.DataFrame.from_dict(result, orient='index')
@@ -56,7 +59,7 @@ if uploaded_file is not None:
         selected = st.selectbox("Select stock", df_res['ticker'])
 
         if selected:
-            chart = yf.download(selected, start=start_date, end=end_date)
+            chart = yf.download(selected, period="6mo")
             if not chart.empty:
                 st.line_chart(chart['Close'])
 
