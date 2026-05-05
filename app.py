@@ -52,7 +52,8 @@ if uploaded_file is not None:
                     for _, val in res.items():
                         results_list.append(val)
 
-            except:
+            except Exception as e:
+                st.write(f"Error in {tick}: {e}")
                 continue
 
             progress.progress((i + 1) / len(tickers))
