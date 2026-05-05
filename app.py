@@ -6,26 +6,26 @@ from stock_selection_v1 import stock_status
 st.title("📈 Nifty 500 Screener")
 df = pd.read_csv("ind_nifty500list.csv")
 
-    # Convert to Yahoo Finance format
-    tickers = df['Symbol'].dropna().apply(lambda x: f"{x}.NS").tolist()
+# Convert to Yahoo Finance format
+tickers = df['Symbol'].dropna().apply(lambda x: f"{x}.NS").tolist()
 
-    st.write(f"Loaded {len(tickers)} stocks ✅")
+st.write(f"Loaded {len(tickers)} stocks ✅")
 
-    start_date = datetime.date(2023, 1, 1)
-    end_date = datetime.date.today()
+start_date = datetime.date(2023, 1, 1)
+end_date = datetime.date.today()
 
-    if st.button("🚀 Run Screener"):
-        result = stock_status(tickers, start_date, end_date)
+if st.button("🚀 Run Screener"):
+    result = stock_status(tickers, start_date, end_date)
 
-        df_res = pd.DataFrame(result).T
+df_res = pd.DataFrame(result).T
 
-        score_cols = ['AboveSMA9','SuperTrend','MACD','ma_20_50_cross']
-        df_res['Score'] = df_res[score_cols].sum(axis=1)
+score_cols = ['AboveSMA9','SuperTrend','MACD','ma_20_50_cross']
+df_res['Score'] = df_res[score_cols].sum(axis=1)
 
-        df_res = df_res.sort_values(by='Score', ascending=False)
+df_res = df_res.sort_values(by='Score', ascending=False)
 
-        st.subheader("🏆 Top 20 Stocks")
-        st.dataframe(df_res.head(20))
+st.subheader("🏆 Top 20 Stocks")
+st.dataframe(df_res.head(20))
 
-        with st.expander("View all"):
-            st.dataframe(df_res)
+with st.expander("View all"):
+    st.dataframe(df_res)
