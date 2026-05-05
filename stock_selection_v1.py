@@ -124,8 +124,8 @@ def check_bullish_ingulfing(df):
   oc, hc, lc, cc = current_candle(df)
   #(op.values, hp, lp, cp)
   #print(oc, hc, lc, cc)
-  if op.values > cp.values and oc.values < cc.values:
-    if oc.values <= cp.values and cc.values > op.values:
+  if op.values > cp.values and oc.values < cc:
+    if oc.values <= cp.values and cc > op.values:
       return True
     else:
       return False
@@ -136,8 +136,8 @@ def check_bearish_ingulfing(df):
   op, hp, lp, cp = prev_day_candle(df)
   oc, hc, lc, cc = current_candle(df)
 
-  if op.values < cp.values and oc.values > cc.values:
-    if oc.values >= cp.values and cc.values < op.values:
+  if op.values < cp.values and oc.values > cc:
+    if oc.values >= cp.values and cc < op.values:
       return True
     else:
       return False
@@ -181,7 +181,7 @@ def check_morning_star(df):
   opp, hpp, lpp, cpp = df.iloc[-3].Open, df.iloc[-3].High, df.iloc[-3].Low, df.iloc[-3].Close
   volume = df.iloc[-5:].Volume.values
 
-  if opp.values > cpp.values and oc.values < cc.values:
+  if opp.values > cpp.values and oc.values < cc:
     dogi = abs(op-cp)
     recent_volume = volume[-1]
     body_of_current_candle = abs(oc-cc)
@@ -190,7 +190,7 @@ def check_morning_star(df):
     opp_pct = (opp - cpp) / opp
     if opp_pct.values >= 0.02:
 
-      if min(op.values,cp.values) < max(opp.values, cc.values):
+      if min(op.values,cp.values) < max(opp.values, cc):
 
         if body_of_current_candle.values >= 0.7 * body_of_pp_candle.values:
 
@@ -216,7 +216,7 @@ def check_evening_star(df):
   opp, hpp, lpp, cpp = df.iloc[-3].Open, df.iloc[-3].High, df.iloc[-3].Low, df.iloc[-3].Close
   volume = df.iloc[-5:].Volume.values
 
-  if opp.values < cpp.values and oc.values > cc.values:
+  if opp.values < cpp.values and oc.values > cc:
     dogi = abs(op-cp)
     recent_volume = volume[-1]
     body_of_current_candle = abs(oc-cc)
@@ -283,7 +283,7 @@ def stock_status(tickers, st, end):
     atr=ATR(df3)
     macd, signal = MACD(df3, fast_length=12, slow_length=26, signal_length=9)
 
-    if cc.values > sma_9[-1]:
+    if cc > sma_9[-1]:
       status[c]['AboveSMA9'] = 1
     else:
       status[c]['AboveSMA9'] = -1
@@ -331,16 +331,16 @@ def stock_status(tickers, st, end):
     else:
       status[c]['Evening_Star'] = 0
 
-    if cc.values > pp:
-      if cc.values < r1:
+    if cc > pp:
+      if cc < r1:
         status[c]['status'] = 'pivot point={}, break_out, R1={}'.format(pp,r1)
         status[c]['Target']=r1
         status[c]['SSL']=pp
-      elif cc.values < r2:
+      elif cc < r2:
         status[c]['status'] = 'R1={}, break_out, R2={}'.format(r1,r2)
         status[c]['Target']=r2
         status[c]['SSL']=r1
-      elif cc.values < r3:
+      elif cc < r3:
         status[c]['status'] = 'R2={}, break_out, R3={}'.format(r2,r3)
         status[c]['Target']=r3
         status[c]['SSL']=r2
@@ -349,12 +349,12 @@ def stock_status(tickers, st, end):
         status[c]['Target']='7%'
         status[c]['SSL']=r3
 
-    elif cc.values < pp:
-      if cc.values > s1:
+    elif cc < pp:
+      if cc > s1:
         status[c]['status'] = 'pivot point={}, break_down, s1={}'.format(pp, s1)
-      elif cc.values > s2:
+      elif cc > s2:
         status[c]['status'] = 'S1={}, break_down, s2={}'.format(s1,s2)
-      elif cc.values > s3:
+      elif cc > s3:
         status[c]['status'] = 'S2={}, break_down, s3={}'.format(s2,s3)
       else:
         status[c]['status'] = 'Break_down all the resistances'
