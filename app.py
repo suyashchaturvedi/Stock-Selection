@@ -17,11 +17,12 @@ if uploaded_file is not None:
         st.error("CSV must contain 'Symbol' column")
         st.stop()
 
-    # Convert to Yahoo format
+    # Prepare tickers
     df['Ticker'] = df['Symbol'].astype(str).str.strip() + ".NS"
     tickers = df['Ticker'].tolist()
 
     st.success(f"Loaded {len(tickers)} stocks ✅")
+    st.write("Sample:", tickers[:5])
 
     # Filters
     col1, col2 = st.columns(2)
@@ -62,15 +63,28 @@ if uploaded_file is not None:
 
         df_res = pd.DataFrame(results_list)
 
-        # Merge industry info
-        df_res = df_res.merge(df[['Ticker', 'Industry']], left_on='ticker', right_on='Ticker', how='left')
+        # ✅ FIX CMP (force numeric only)
+        df_res['cmp'] = pd.to_numeric(df_res['cmp'], errors='coerce')
+        df_res['cmp'] = df_res['cmp'].round(2)
 
-        # Score
+        # Merge Industry safely
+        df_res = df_res.merge(
+            df[['Ticker', 'Industry']],
+            left_on='ticker',
+            right_on='Ticker',
+            how='left'
+        )
+
+        df_res.drop(columns=['Ticker'], inplace=True)
+
+        # Score calculation
         score_cols = ['AboveSMA9', 'SuperTrend', 'MACD', 'ma_20_50_cross']
         score_cols = [col for col in score_cols if col in df_res.columns]
 
         if score_cols:
             df_res['Score'] = df_res[score_cols].sum(axis=1)
+        else:
+            df_res['Score'] = 0
 
         # Apply filters
         df_res = df_res[df_res['Score'] >= min_score]
@@ -78,26 +92,29 @@ if uploaded_file is not None:
         if industry != "All":
             df_res = df_res[df_res['Industry'] == industry]
 
+        # Sort
         df_res = df_res.sort_values(by='Score', ascending=False)
+
+        # Clean column order
+        cols = ['ticker', 'cmp', 'Score'] + [c for c in df_res.columns if c not in ['ticker','cmp','Score']]
+        df_res = df_res[cols]
 
         st.success("Dashboard Ready ✅")
 
-        # 🔥 Top Picks
-        st.subheader("🏆 Top Picks")
-        top_picks = df_res.head(10)
-        st.dataframe(top_picks, use_container_width=True)
+        # 🏆 Top Picks
+        st.subheader("🏆 Top 10 Picks")
+        st.dataframe(df_res.head(10), use_container_width=True)
 
-        # 📊 Select stock for chart
+        # 📈 Chart
         st.subheader("📈 Stock Chart")
 
-        selected_stock = st.selectbox("Select stock", df_res['ticker'].unique())
+        selected_stock = st.selectbox("Select stock", df_res['ticker'].dropna().unique())
 
         if selected_stock:
-            data = yf.download(selected_stock, start=start_date, end=end_date)
+            chart_data = yf.download(selected_stock, start=start_date, end=end_date)
+            st.line_chart(chart_data['Close'])
 
-            st.line_chart(data['Close'])
-
-        # 📥 Download button
+        # 📥 Download
         st.subheader("📥 Download Results")
 
         csv = df_res.to_csv(index=False).encode('utf-8')
