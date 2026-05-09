@@ -261,10 +261,15 @@ def stock_status(tickers, start, end):
         df_final.loc[:, 'Final SL'] = ((df_final['SSL'] + df_final['cmp']) / 2).round()
         df_final.loc[:, 'SL %'] = (100 - (df_final['Final SL'] / df_final['cmp']) * 100).round()
 
-        df_final.loc[:, 'RR'] = (
-            (df_final['Target'] - df_final['cmp']) /
-            (df_final['cmp'] - df_final['Final SL'])
-        ).round(2)
+        df_final['RR'] = np.where(
+        (df_final['cmp'] > df_final['Final SL']) & 
+        (df_final['Target'] > df_final['cmp']),
+        (df_final['Target'] - df_final['cmp']) /
+        (df_final['cmp'] - df_final['Final SL']),
+        np.nan
+        )
+
+        df_final['RR'] = df_final['RR'].round(2)
 
         df_final = df_final.sort_values(by="Score", ascending=False).reset_index(drop=True)
 
