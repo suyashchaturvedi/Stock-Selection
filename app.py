@@ -32,6 +32,10 @@ tickers_input = st.sidebar.text_area(
 min_rsi = st.sidebar.slider("Minimum RSI", 30, 80, 55)
 min_rr = st.sidebar.slider("Minimum RR", 0.5, 5.0, 1.5)
 
+min_target_pct = st.sidebar.slider(
+    "Minimum Target %",
+    0, 50, 20   # range: 0% to 50%, default 20%
+)
 bullish_only = st.sidebar.checkbox("Bullish Trend Only", True)
 macd_positive = st.sidebar.checkbox("MACD Positive", True)
 
@@ -146,7 +150,7 @@ if run_button:
         df_filtered = df_filtered[df_filtered['MACD'] == 1]
 
     df_filtered = df_filtered[df_filtered['RSI'] >= min_rsi]
-    df_filtered = df_filtered[df_filtered['Target %'] > 0]
+    df_filtered = df_filtered[df_filtered['Target %'] >= min_target_pct]
 
     # Safe RR filter (optional)
     df_filtered = df_filtered[df_filtered['RR'].notna()]
