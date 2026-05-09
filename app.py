@@ -4,7 +4,7 @@ import numpy as np
 import yfinance as yf
 import plotly.graph_objects as go
 
-from stock_selection_final import run_stock_selection
+from stock_selection_v1 import run_stock_selection
 
 # ---------------- PAGE CONFIG ---------------- #
 st.set_page_config(page_title="Stock Screener", layout="wide")
