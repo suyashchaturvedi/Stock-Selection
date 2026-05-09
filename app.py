@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
-from stock_selection_v1 import run_stock_selection
+from stock_selection_final import run_stock_selection
 
-# ---------------- PAGE CONFIG ---------------- #
 st.set_page_config(page_title="Stock Screener", layout="wide")
 
 st.title("📈 Stock Screener Dashboard")
@@ -15,11 +14,19 @@ def cached_run(tickers):
 # ---------------- SIDEBAR ---------------- #
 st.sidebar.header("🔧 Controls")
 
-tickers_input = st.sidebar.text_area(
-    "Enter tickers (comma separated)",
-    "RELIANCE.NS,TCS.NS,INFY.NS,HDFCBANK.NS"
+# 🔹 CSV Upload
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV (with 'ticker' column)",
+    type=["csv"]
 )
 
+# 🔹 Manual Input
+tickers_input = st.sidebar.text_area(
+    "Or enter tickers manually",
+    "RELIANCE.NS,TCS.NS,INFY.NS"
+)
+
+# 🔹 Filters
 min_rsi = st.sidebar.slider("Minimum RSI", 30, 80, 55)
 min_rr = st.sidebar.slider("Minimum RR", 0.5, 5.0, 1.5)
 
@@ -30,10 +37,36 @@ top_n = st.sidebar.slider("Top Trades", 5, 50, 10)
 
 run_button = st.sidebar.button("🚀 Run Screener")
 
+# ---------------- INPUT HANDLING ---------------- #
+
+def get_tickers():
+    # Priority: CSV > Manual input
+    if uploaded_file is not None:
+        df_upload = pd.read_csv(uploaded_file)
+
+        # Normalize column names
+        df_upload.columns = [c.lower() for c in df_upload.columns]
+
+        if 'ticker' not in df_upload.columns:
+            st.error("CSV must contain a 'ticker' column")
+            return []
+
+        tickers = df_upload['ticker'].dropna().astype(str).tolist()
+        return tickers
+
+    else:
+        return [t.strip() for t in tickers_input.split(",") if t.strip()]
+
 # ---------------- MAIN ---------------- #
 if run_button:
 
-    tickers = [t.strip() for t in tickers_input.split(",") if t.strip()]
+    tickers = get_tickers()
+
+    if not tickers:
+        st.warning("No tickers provided")
+        st.stop()
+
+    st.write(f"📌 Running for {len(tickers)} tickers")
 
     with st.spinner("Analyzing stocks..."):
         try:
@@ -73,7 +106,7 @@ if run_button:
     if not df_filtered.empty:
         df_filtered = df_filtered.copy()
 
-        df_filtered.loc[:, 'RankScore'] = (
+        df_filtered['RankScore'] = (
             df_filtered['Score'] * 0.6 +
             df_filtered['RR'] * 0.4
         )
@@ -84,7 +117,7 @@ if run_button:
     else:
         df_top = pd.DataFrame()
 
-    # ---------------- TABS ---------------- #
+    # ---------------- DISPLAY ---------------- #
     tab1, tab2, tab3 = st.tabs(["📊 All Stocks", "✅ Filtered", "🔥 Top Trades"])
 
     with tab1:
