@@ -1,7 +1,12 @@
 import streamlit as st
 import pandas as pd
-from stock_selection_v1 import run_stock_selection
+import numpy as np
+import yfinance as yf
+import plotly.graph_objects as go
 
+from stock_selection_final import run_stock_selection
+
+# ---------------- PAGE CONFIG ---------------- #
 st.set_page_config(page_title="Stock Screener", layout="wide")
 
 st.title("📈 Stock Screener Dashboard")
@@ -14,19 +19,16 @@ def cached_run(tickers):
 # ---------------- SIDEBAR ---------------- #
 st.sidebar.header("🔧 Controls")
 
-# 🔹 CSV Upload
 uploaded_file = st.sidebar.file_uploader(
-    "Upload CSV (with 'ticker' column)",
+    "Upload CSV (Symbol / ticker column)",
     type=["csv"]
 )
 
-# 🔹 Manual Input
 tickers_input = st.sidebar.text_area(
     "Or enter tickers manually",
     "RELIANCE.NS,TCS.NS,INFY.NS"
 )
 
-# 🔹 Filters
 min_rsi = st.sidebar.slider("Minimum RSI", 30, 80, 55)
 min_rr = st.sidebar.slider("Minimum RR", 0.5, 5.0, 1.5)
 
@@ -37,17 +39,12 @@ top_n = st.sidebar.slider("Top Trades", 5, 50, 10)
 
 run_button = st.sidebar.button("🚀 Run Screener")
 
-# ---------------- INPUT HANDLING ---------------- #
-
+# ---------------- TICKER HANDLING ---------------- #
 def get_tickers():
-    # Priority: CSV > Manual input
     if uploaded_file is not None:
         df_upload = pd.read_csv(uploaded_file)
-
-        # Normalize column names
         df_upload.columns = [c.lower() for c in df_upload.columns]
 
-        # Accept both 'symbol' and 'ticker'
         col_found = None
         for col in ['symbol', 'ticker']:
             if col in df_upload.columns:
@@ -55,7 +52,7 @@ def get_tickers():
                 break
 
         if col_found is None:
-            st.error("CSV must contain 'Symbol' or 'ticker' column")
+            st.error("CSV must contain 'Symbol' or 'ticker'")
             return []
 
         tickers = (
@@ -66,7 +63,6 @@ def get_tickers():
             .str.upper()
             .tolist()
         )
-
     else:
         tickers = [
             t.strip().upper()
@@ -74,7 +70,7 @@ def get_tickers():
             if t.strip()
         ]
 
-    # 🔥 Append .NS safely
+    # Append .NS safely
     tickers = [
         t if t.endswith(".NS") else f"{t}.NS"
         for t in tickers
@@ -84,6 +80,29 @@ def get_tickers():
     tickers = list(dict.fromkeys(tickers))
 
     return tickers
+
+# ---------------- CHART FUNCTION ---------------- #
+def plot_stock_chart(ticker):
+    df = yf.download(ticker, period="6mo", auto_adjust=True, progress=False)
+
+    if df.empty:
+        return None
+
+    df['SMA20'] = df['Close'].rolling(20).mean()
+    df['SMA50'] = df['Close'].rolling(50).mean()
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Close"))
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], name="SMA 20"))
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA50'], name="SMA 50"))
+
+    fig.update_layout(
+        title=f"{ticker} Price Chart",
+        height=500
+    )
+
+    return fig
 
 # ---------------- MAIN ---------------- #
 if run_button:
@@ -109,7 +128,7 @@ if run_button:
 
     st.success("Analysis Complete")
 
-    # ---------------- KPI METRICS ---------------- #
+    # ---------------- KPI ---------------- #
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("Total Stocks", len(df))
@@ -117,7 +136,7 @@ if run_button:
     col3.metric("Bullish Count", int((df['Above_SMA9'] == 1).sum()))
     col4.metric("High RR (>2)", int((df['RR'] > 2).sum()))
 
-    # ---------------- FILTER LOGIC ---------------- #
+    # ---------------- FILTER ---------------- #
     df_filtered = df.copy()
 
     if bullish_only:
@@ -127,25 +146,23 @@ if run_button:
         df_filtered = df_filtered[df_filtered['MACD'] == 1]
 
     df_filtered = df_filtered[df_filtered['RSI'] >= min_rsi]
-    df_filtered = df_filtered[df_filtered['RR'] >= min_rr]
     df_filtered = df_filtered[df_filtered['Target %'] > 0]
 
-    # ---------------- TOP TRADES ---------------- #
-    if not df_filtered.empty:
-        df_filtered = df_filtered.copy()
+    # Safe RR filter (optional)
+    df_filtered = df_filtered[df_filtered['RR'].notna()]
+    df_filtered = df_filtered[df_filtered['RR'] >= min_rr]
 
-        df_filtered['RankScore'] = (
-            df_filtered['Score'] * 0.6 +
-            df_filtered['RR'] * 0.4
-        )
+    # ---------------- RANK SCORE ---------------- #
+    df_filtered['RankScore'] = (
+        df_filtered['Score'] * 0.6 +
+        df_filtered['RR'].fillna(0) * 0.4
+    )
 
-        df_top = df_filtered.sort_values(
-            by="RankScore", ascending=False
-        ).head(top_n)
-    else:
-        df_top = pd.DataFrame()
+    df_top = df_filtered.sort_values(
+        by="RankScore", ascending=False
+    ).head(top_n)
 
-    # ---------------- DISPLAY ---------------- #
+    # ---------------- TABS ---------------- #
     tab1, tab2, tab3 = st.tabs(["📊 All Stocks", "✅ Filtered", "🔥 Top Trades"])
 
     with tab1:
@@ -157,18 +174,25 @@ if run_button:
     with tab3:
         st.dataframe(df_top, use_container_width=True)
 
-    # ---------------- CHARTS ---------------- #
-    st.subheader("📊 RSI Distribution")
-    st.bar_chart(df['RSI'])
+    # ---------------- CHART ---------------- #
+    st.subheader("📈 Stock Chart")
 
     if not df_top.empty:
-        st.subheader("🔥 Top Trades Upside %")
-        st.bar_chart(df_top.set_index('ticker')['Target %'])
+        selected_ticker = st.selectbox(
+            "Select stock",
+            df_top['ticker']
+        )
+
+        chart = plot_stock_chart(selected_ticker)
+
+        if chart:
+            st.plotly_chart(chart, use_container_width=True)
+        else:
+            st.warning("No chart data")
 
     # ---------------- DOWNLOAD ---------------- #
     st.download_button(
         "⬇️ Download Top Trades",
         df_top.to_csv(index=False),
-        "top_trades.csv",
-        "text/csv"
+        "top_trades.csv"
     )
