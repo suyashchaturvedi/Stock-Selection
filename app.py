@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from stock_selection_final import run_stock_selection
+from stock_selection_v1 import run_stock_selection
 
 st.set_page_config(page_title="Stock Screener", layout="wide")
 
