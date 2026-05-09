@@ -47,15 +47,43 @@ def get_tickers():
         # Normalize column names
         df_upload.columns = [c.lower() for c in df_upload.columns]
 
-        if 'ticker' not in df_upload.columns:
-            st.error("CSV must contain a 'ticker' column")
+        # Accept both 'symbol' and 'ticker'
+        col_found = None
+        for col in ['symbol', 'ticker']:
+            if col in df_upload.columns:
+                col_found = col
+                break
+
+        if col_found is None:
+            st.error("CSV must contain 'Symbol' or 'ticker' column")
             return []
 
-        tickers = df_upload['ticker'].dropna().astype(str).tolist()
-        return tickers
+        tickers = (
+            df_upload[col_found]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            .tolist()
+        )
 
     else:
-        return [t.strip() for t in tickers_input.split(",") if t.strip()]
+        tickers = [
+            t.strip().upper()
+            for t in tickers_input.split(",")
+            if t.strip()
+        ]
+
+    # 🔥 Append .NS safely
+    tickers = [
+        t if t.endswith(".NS") else f"{t}.NS"
+        for t in tickers
+    ]
+
+    # Remove duplicates
+    tickers = list(dict.fromkeys(tickers))
+
+    return tickers
 
 # ---------------- MAIN ---------------- #
 if run_button:
