@@ -12,7 +12,9 @@ st.set_page_config(page_title="Stock Screener", layout="wide")
 st.title("📈 Stock Screener Dashboard")
 
 # ---------------- CACHE ---------------- #
-@st.cache_data
+@st.cache_data(ttl=300)
+if refresh:
+   st.cache_data.clear()
 def cached_run(tickers):
     return run_stock_selection(tickers)
 
@@ -23,7 +25,7 @@ uploaded_file = st.sidebar.file_uploader(
     "Upload CSV (Symbol / ticker column)",
     type=["csv"]
 )
-
+refresh = st.sidebar.button("🔄 Refresh Data")
 tickers_input = st.sidebar.text_area(
     "Or enter tickers manually",
     "RELIANCE.NS,TCS.NS,INFY.NS"
